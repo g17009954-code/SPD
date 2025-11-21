@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>🔥 FPS Feel Game + Game Booster</title>
+<style>
+  :root{--bg:#000;--panel:#111;--accent:#00ff99;--text:#00ff99}
+  html,body{height:100%;margin:0;background:var(--bg);font-family:Arial,sans-serif;color:var(--text);display:flex;flex-direction:column;align-items:center;}
+  #gameCanvas{display:block;background:#111;margin-top:10px;border-radius:6px;image-rendering:pixelated;}
+  #controls{display:flex;flex-wrap:wrap;justify-content:center;margin-top:10px;gap:10px;max-width:1100px}
+  .slider-container,.toggle-container{background:var(--panel);padding:8px 12px;border-radius:8px;display:flex;flex-direction:column;align-items:center;font-size:14px}
+  input[type=range]{width:150px}
+  input[type=checkbox]{transform:scale(1.15);margin-top:6px}
+  #fpsDisplay{
+    position:fixed;top:10px;left:10px;font-size:18px;background:rgba(0,0,0,0.6);padding:6px 10px;border-radius:8px;color:#00ff66;
+    z-index:2147483647;filter:none !important;backdrop-filter:none !important;pointer-events:none;mix-blend-mode:normal !important;
+  }
+  @keyframes screenShake{
+    0% {transform: translate(0px, 0px);}
+    25% {transform: translate(6px, -6px);}
+    50% {transform: translate(-6px, 6px);}
+    75% {transform: translate(6px, 6px);}
+    100% {transform: translate(0px, 0px);}
+  }
+  .crashEffect{animation: screenShake 0.05s infinite;filter: brightness(500%) contrast(300%) saturate(300%) blur(5px);}
+</style>
+</head>
+<body>
+
+<div id="fpsDisplay">FPS: 0</div>
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<div id="controls">
+  <!-- Sliders -->
+  <div class="slider-container">
+    <label>FPS Limit: <span id="fpsSliderValue">60</span></label>
+    <input id="fpsSlider" type="range" min="10" max="500" value="60">
+  </div>
+  <div class="slider-container">
+    <label>Brightness: <span id="brightnessSliderValue">100%</span></label>
+    <input id="brightnessSlider" type="range" min="50" max="1000" value="100">
+  </div>
+  <div class="slider-container">
+    <label>Contrast: <span id="contrastSliderValue">100%</span></label>
+    <input id="contrastSlider" type="range" min="50" max="300" value="100">
+  </div>
+  <div class="slider-container">
+    <label>Saturation: <span id="saturationSliderValue">100%</span></label>
+    <input id="saturationSlider" type="range" min="0" max="300" value="100">
+  </div>
+  <div class="slider-container">
+    <label>Blur: <span id="blurSliderValue">0px</span></label>
+    <input id="blurSlider" type="range" min="0" max="10" step="0.1" value="0">
+  </div>
+  <div class="slider-container">
+    <label>Sharpness: <span id="sharpnessSliderValue">1</span></label>
+    <input id="sharpnessSlider" type="range" min="0.1" max="5" step="0.1" value="1">
+  </div>
+  <div class="slider-container">
+    <label>Load: <span id="loadSliderValue">200</span></label>
+    <input id="loadSlider" type="range" min="1" max="1000000000" value="200">
+  </div>
+
+  <!-- Toggles -->
+  <div class="toggle-container"><label>Motion Blur</label><input id="motionBlurToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>Fullscreen</label><input id="fullscreenToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>Stretch Screen</label><input id="stretchToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>HDR+</label><input id="hdrToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>Unlock Hz</label><input id="unlockHzToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>Unlock Performance</label><input id="unlockPerformanceToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>Unlock 8K 120 FPS</label><input id="unlock8kToggle" type="checkbox"></div>
+  <div class="toggle-container"><label>FPS Meter</label><input id="fpsMeterToggle" type="checkbox" checked></div>
+  <div class="toggle-container"><label>Ultra HDR 8K 240+ FPS (CRASH)</label><input id="ultraHDRToggle" type="checkbox"></div>
+
+  <!-- RGB Mode -->
+  <div class="toggle-container"><label>RGB Mode</label><input id="rgbToggle" type="checkbox"></div>
+  <div class="slider-container">
+    <label>RGB Speed: <span id="rgbSpeedValue">100</span></label>
+    <input id="rgbSpeedSlider" type="range" min="10" max="500" value="100">
+  </div>
+
+  <!-- Budget Mode -->
+  <div class="toggle-container"><label>Budget Mode</label><input id="budgetToggle" type="checkbox"></div>
+
+  <!-- Shadows -->
+  <div class="toggle-container"><label>Shadows</label><input id="shadowsToggle" type="checkbox"></div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const fpsDisplay = document.getElementById('fpsDisplay');
+
+const player = { x: 400, y: 250, size: 20, speed: 5 };
+let totalEnemies = 200;
+let enemies = [];
+
+const fpsSlider = document.getElementById('fpsSlider');
+const brightnessSlider = document.getElementById('brightnessSlider');
+const contrastSlider = document.getElementById('contrastSlider');
+const saturationSlider = document.getElementById('saturationSlider');
+const blurSlider = document.getElementById('blurSlider');
+const sharpnessSlider = document.getElementById('sharpnessSlider');
+const loadSlider = document.getElementById('loadSlider');
+
+const fpsSliderValue = document.getElementById('fpsSliderValue');
+const brightnessSliderValue = document.getElementById('brightnessSliderValue');
+const contrastSliderValue = document.getElementById('contrastSliderValue');
+const saturationSliderValue = document.getElementById('saturationSliderValue');
+const blurSliderValue = document.getElementById('blurSliderValue');
+const sharpnessSliderValue = document.getElementById('sharpnessSliderValue');
+const loadSliderValue = document.getElementById('loadSliderValue');
+
+const motionBlurToggle = document.getElementById('motionBlurToggle');
+const fullscreenToggle = document.getElementById('fullscreenToggle');
+const stretchToggle = document.getElementById('stretchToggle');
+const hdrToggle = document.getElementById('hdrToggle');
+const unlockHzToggle = document.getElementById('unlockHzToggle');
+const unlockPerformanceToggle = document.getElementById('unlockPerformanceToggle');
+const unlock8kToggle = document.getElementById('unlock8kToggle');
+const fpsMeterToggle = document.getElementById('fpsMeterToggle');
+const ultraHDRToggle = document.getElementById('ultraHDRToggle');
+
+const rgbToggle = document.getElementById('rgbToggle');
+const rgbSpeedSlider = document.getElementById('rgbSpeedSlider');
+const rgbSpeedValue = document.getElementById('rgbSpeedValue');
+
+const budgetToggle = document.getElementById('budgetToggle');
+const shadowsToggle = document.getElementById('shadowsToggle');
+
+let fpsLimit = parseInt(fpsSlider.value);
+let brightness = parseInt(brightnessSlider.value);
+let contrast = parseInt(contrastSlider.value);
+let saturation = parseInt(saturationSlider.value);
+let blur = parseFloat(blurSlider.value);
+let sharpness = parseFloat(sharpnessSlider.value);
+let load = parseInt(loadSlider.value);
+let motionBlur = false;
+let keys = {};
+let stoppedByUltra = false;
+let rgbMode = false, rgbSpeed = 100, rgbHue = 0;
+let budgetMode = false;
+let shadows = false;
+
+window.addEventListener('keydown', e => keys[e.key]=true);
+window.addEventListener('keyup', e => keys[e.key]=false);
+
+// --- Slider handlers ---
+fpsSlider.addEventListener('input',()=>{ if(!unlockHzToggle.checked && !ultraHDRToggle.checked) fpsLimit=parseInt(fpsSlider.value); fpsSliderValue.textContent=fpsLimit; });
+brightnessSlider.addEventListener('input',()=>{ brightness=parseInt(brightnessSlider.value); brightnessSliderValue.textContent=brightness+'%'; updateFilters(); });
+contrastSlider.addEventListener('input',()=>{ contrast=parseInt(contrastSlider.value); contrastSliderValue.textContent=contrast+'%'; updateFilters(); });
+saturationSlider.addEventListener('input',()=>{ saturation=parseInt(saturationSlider.value); saturationSliderValue.textContent=saturation+'%'; updateFilters(); });
+blurSlider.addEventListener('input',()=>{ blur=parseFloat(blurSlider.value); blurSliderValue.textContent=blur+'px'; updateFilters(); });
+sharpnessSlider.addEventListener('input',()=>{ sharpness=parseFloat(sharpnessSlider.value); sharpnessSliderValue.textContent=sharpness; });
+loadSlider.addEventListener('input',()=>{ load=parseInt(loadSlider.value); loadSliderValue.textContent=load.toLocaleString(); totalEnemies=load; initEnemies(); });
+
+// --- Toggle handlers ---
+motionBlurToggle.addEventListener('change',()=>motionBlur=motionBlurToggle.checked);
+hdrToggle.addEventListener('change',()=>{ hdrToggle.checked?(brightness=150,contrast=150,updateFilters()):(brightness=parseInt(brightnessSlider.value),contrast=parseInt(contrastSlider.value),updateFilters()); });
+unlockHzToggle.addEventListener('change',()=>{ fpsLimit = unlockHzToggle.checked?1000:parseInt(fpsSlider.value); fpsSliderValue.textContent=fpsLimit; });
+unlockPerformanceToggle.addEventListener('change',()=>{ totalEnemies = unlockPerformanceToggle.checked?Math.max(totalEnemies,Math.min(1000000000,load)):load; initEnemies(); });
+unlock8kToggle.addEventListener('change',()=>{ if(unlock8kToggle.checked){ canvas.width=1920; canvas.height=1080; fpsLimit=120; totalEnemies=Math.min(1000000,load); initEnemies();} else{ canvas.width=800; canvas.height=500; fpsLimit=parseInt(fpsSlider.value); totalEnemies=load; initEnemies();} });
+fpsMeterToggle.addEventListener('change',()=>{ fpsDisplay.style.display=fpsMeterToggle.checked?'block':'none'; });
+
+// RGB handlers
+rgbToggle.addEventListener('change',()=>{ rgbMode=rgbToggle.checked; });
+rgbSpeedSlider.addEventListener('input',()=>{ rgbSpeed=parseInt(rgbSpeedSlider.value); rgbSpeedValue.textContent=rgbSpeed; });
+
+// Budget
+budgetToggle.addEventListener('change',()=>{ budgetMode=budgetToggle.checked; applyBudgetMode(); });
+
+// Shadows
+shadowsToggle.addEventListener('change',()=>{ shadows=shadowsToggle.checked; });
+
+// Fullscreen & Stretch
+fullscreenToggle.addEventListener('change',()=>{ fullscreenToggle.checked?canvas.requestFullscreen().catch(()=>{fullscreenToggle.checked=false;}):document.exitFullscreen(); });
+function applyStretch(){ 
+  if(stretchToggle.checked){
+    canvas.style.width=window.innerWidth+'px'; canvas.style.height=window.innerHeight+'px';
+  } else{
+    canvas.style.width=budgetMode?'100px':'800px';
+    canvas.style.height=budgetMode?'100px':'500px';
+  }
+}
+stretchToggle.addEventListener('change',applyStretch);
+document.addEventListener('fullscreenchange',applyStretch);
+
+// --- Functions ---
+function applyBudgetMode(){
+  if(budgetMode){
+    canvas.width=100; canvas.height=100;
+    fpsLimit=5;
+    totalEnemies=10;
+    initEnemies();
+    applyStretch();
+  } else {
+    canvas.width=800; canvas.height=500;
+    fpsLimit=parseInt(fpsSlider.value);
+    totalEnemies=load;
+    initEnemies();
+    applyStretch();
+  }
+}
+
+function updateFilters(){
+  canvas.style.filter=`brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`;
+  fpsDisplay.style.filter='none'; fpsDisplay.style.backdropFilter='none';
+}
+
+function initEnemies(){
+  enemies=[];
+  const visibleCount=Math.min(3000,totalEnemies);
+  for(let i=0;i<visibleCount;i++){
+    enemies.push({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, size:6+Math.random()*12, speedX:(Math.random()-0.5)*3, speedY:(Math.random()-0.5)*3 });
+  }
+}
+
+// --- Game loop ---
+function update(){
+  if(keys['ArrowUp']) player.y-=player.speed;
+  if(keys['ArrowDown']) player.y+=player.speed;
+  if(keys['ArrowLeft']) player.x-=player.speed;
+  if(keys['ArrowRight']) player.x+=player.speed;
+  player.x=Math.max(0,Math.min(canvas.width-player.size,player.x));
+  player.y=Math.max(0,Math.min(canvas.height-player.size,player.y));
+  for(let e of enemies){ e.x+=e.speedX; e.y+=e.speedY; if(e.x<0||e.x>canvas.width) e.speedX*=-1; if(e.y<0||e.y>canvas.height) e.speedY*=-1; }
+}
+
+function draw(){
+  ctx.fillStyle=motionBlur?'rgba(17,17,17,0.35)':'#111';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Shadows
+  if(shadows){
+    ctx.shadowColor='rgba(0,0,0,0.7)';
+    ctx.shadowBlur=5;
+  } else { ctx.shadowBlur=0; }
+
+  // RGB or normal
+  if(rgbMode){
+    rgbHue += rgbSpeed*0.01; if(rgbHue>360) rgbHue-=360;
+    ctx.fillStyle=`hsl(${rgbHue},100%,50%)`;
+    ctx.fillRect(player.x,player.y,player.size,player.size);
+    for(let e of enemies){ ctx.fillStyle=`hsl(${(rgbHue+180)%360},100%,50%)`; ctx.fillRect(e.x,e.y,e.size,e.size); }
+  } else{
+    ctx.fillStyle='#00ff99'; ctx.fillRect(player.x,player.y,player.size,player.size);
+    ctx.fillStyle='#ff4444'; for(let e of enemies) ctx.fillRect(e.x,e.y,e.size,e.size);
+  }
+
+  // Sharpness overlay
+  if(Math.abs(sharpness-1)>0.01){ ctx.save(); ctx.globalAlpha=0.06*sharpness; ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); }
+}
+
+// --- FPS & loop ---
+let lastFrameTime=performance.now(), fpsCounter=0, fpsTimer=performance.now(), displayedFps=0, rafId=null;
+function gameLoop(timestamp){
+  if(stoppedByUltra) return;
+  const delta=timestamp-lastFrameTime;
+  if(delta>=1000/fpsLimit){ lastFrameTime=timestamp; update(); draw(); fpsCounter++; }
+  if(timestamp-fpsTimer>=1000){ displayedFps=fpsCounter; fpsCounter=0; fpsTimer=timestamp; if(fpsMeterToggle.checked) fpsDisplay.textContent='FPS: '+displayedFps; }
+  rafId=requestAnimationFrame(gameLoop);
+}
+rafId=requestAnimationFrame(gameLoop);
+
+// --- Ultra HDR Crash ---
+ultraHDRToggle.addEventListener('change',()=>{
+  if(ultraHDRToggle.checked){
+    if(stoppedByUltra) return;
+    canvas.classList.add('crashEffect');
+    setTimeout(()=>{
+      try{ canvas.width=7680; canvas.height=4320; } catch(e){ canvas.width=Math.min(4096,window.innerWidth*2); canvas.height=Math.min(2160,window.innerHeight*2); }
+      totalEnemies=Math.max(totalEnemies,70000); enemies=[]; const visibleCount=Math.min(5000,totalEnemies); for(let i=0;i<visibleCount;i++){ enemies.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,size:6+Math.random()*12,speedX:(Math.random()-0.5)*6,speedY:(Math.random()-0.5)*6}); }
+      brightness=1000; contrast=300; saturation=300; blur=8; updateFilters(); fpsLimit=240;
+    },250);
+    setTimeout(()=>{ canvas.style.transition='filter 0.15s ease'; canvas.style.filter='brightness(2000%) saturate(500%) blur(10px)'; },700);
+    setTimeout(()=>{
+      try{ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.restore(); } catch(e){}
+      stoppedByUltra=true; if(rafId) cancelAnimationFrame(rafId); canvas.classList.add('crashEffect');
+    },1100);
+  }
+});
+
+updateFilters();
+applyStretch();
+</script>
+</body>
+</html>
